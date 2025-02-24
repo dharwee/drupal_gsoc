@@ -1,0 +1,104 @@
+<?php
+
+function ai_media_proof_entity_insert(\Drupal\Core\Entity\EntityInterface $entity) {
+  
+  if ($entity->getEntityTypeId() === 'media') {
+    \Drupal::logger('ai_media_proof')->notice('hook_entity_insert: Media entity inserted with ID: @id', [
+      '@id' => $entity->id(),
+    ]);
+
+ 
+    \Drupal::logger('ai_media_proof')->notice('Media bundle: @bundle', [
+      '@bundle' => $entity->bundle(),
+    ]);
+
+   
+    if ($entity->bundle() === 'image') {
+      \Drupal::logger('ai_media_proof')->notice('hook_entity_insert: Media is an image. Proceeding with AI caption generation.');
+
+      $caption = ai_media_proof_generate_caption_from_ai($entity);
+
+      if (!empty($caption)) {
+        \Drupal::logger('ai_media_proof')->notice('hook_entity_insert: AI caption generated: @caption', [
+          '@caption' => $caption,
+        ]);
+
+
+
+      if ($entity->hasField('field_field_ai_caption')) {
+  $entity->set('field_field_ai_caption', $caption);
+  $entity->save();
+}
+else {
+  \Drupal::logger('ai_media_proof')->error('The field "field_field_ai_caption" does not exist on this media entity.');
+}
+
+        \Drupal::logger('ai_media_proof')->notice('hook_entity_insert: AI caption saved to media entity.');
+      }
+      else {
+        \Drupal::logger('ai_media_proof')->warning('hook_entity_insert: No AI caption generated.');
+      }
+    }
+    else {
+      \Drupal::logger('ai_media_proof')->notice('hook_entity_insert: Media entity is not an image. Skipping AI caption generation.');
+    }
+  }
+}
+
+function ai_media_proof_generate_caption_from_ai(\Drupal\media\Entity\Media $media) {
+ 
+  $file = $media->get('field_media_image')->entity;
+  if (!$file) {
+    \Drupal::logger('ai_media_proof')->warning('No file found in media entity.');
+    return '';
+  }
+
+
+  $real_path = \Drupal::service('file_system')->realpath($file->getFileUri());
+
+  
+  $image_data = file_get_contents($real_path);
+
+  
+  $mime_type = $file->getMimeType();
+
+  \Drupal::logger('ai_media_proof')->notice('Processing image file: @path with mime type @mime', [
+    '@path' => $real_path,
+    '@mime' => $mime_type,
+  ]);
+
+  try {
+    $client = \Drupal::httpClient();
+
+    
+    $url = 'https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning?wait_for_model=true';
+
+    
+    $response = $client->post($url, [
+      'headers' => [
+        'Authorization' => 'Bearer hf_xx123',
+        
+        'Content-Type'  => $mime_type,
+      ],
+      'body' => $image_data,
+    ]);
+
+    $responseBody = $response->getBody()->getContents();
+    \Drupal::logger('ai_media_proof')->notice('API Response body: @response', ['@response' => $responseBody]);
+
+    $data = json_decode($responseBody, TRUE);
+
+    if (isset($data[0]['generated_text'])) {
+      \Drupal::logger('ai_media_proof')->notice('AI Caption generated: @caption', ['@caption' => $data[0]['generated_text']]);
+      return $data[0]['generated_text'];
+    }
+    else {
+      \Drupal::logger('ai_media_proof')->warning('No caption received from the AI API.');
+    }
+  }
+  catch (\Exception $e) {
+    \Drupal::logger('ai_media_proof')->error('AI caption generation failed: @message', ['@message' => $e->getMessage()]);
+  }
+
+  return '';
+}
