@@ -1,0 +1,5 @@
+name: 'AI Media Proof'
+type: module
+description: 'Example module to generate image captions via Hugging Face when media is inserted or updated.'
+core_version_requirement: '^10'
+package: Custom
