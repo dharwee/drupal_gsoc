@@ -1,0 +1,6 @@
+services:
+  ai_media_proof.media_insert_subscriber:
+    class: Drupal\ai_media_proof\EventSubscriber\MediaInsertSubscriber
+    arguments: ['@entity_type.manager', '@http_client_factory']
+    tags:
+      - { name: event_subscriber }
