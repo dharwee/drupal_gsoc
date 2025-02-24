@@ -1,0 +1,5 @@
+name: 'AI Media Proof'
+type: module
+core_version_requirement: ^10
+description: 'Proof-of-work module for AI-powered media caption generation integrated with Drupal 10 Media Library.'
+package: Custom
